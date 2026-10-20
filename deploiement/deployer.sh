@@ -21,7 +21,10 @@ MODE="--dry-run"
 [ "${1:-}" = "--envoyer" ] && MODE=""
 
 # shellcheck disable=SC2086
-rsync -rlptz --delete $MODE $EXCLUSIONS --itemize-changes \
+# `--chmod` plutôt que `-p` : sans cela rsync recopie les permissions du poste, et le
+# répertoire est arrivé en 700 — Apache, qui tourne en www-data, répondait 403 sur un
+# dossier pourtant rempli. Les modes sont donc imposés, pas hérités.
+rsync -rltz --chmod=D755,F644 --delete $MODE $EXCLUSIONS --itemize-changes \
   "$RACINE"/ "$HOTE:$CIBLE/"
 
 if [ -n "$MODE" ]; then
