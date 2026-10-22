@@ -21,16 +21,24 @@ MODE="--dry-run"
 [ "${1:-}" = "--envoyer" ] && MODE=""
 
 # shellcheck disable=SC2086
-# `--chmod` plutôt que `-p` : sans cela rsync recopie les permissions du poste, et le
-# répertoire est arrivé en 700 — Apache, qui tourne en www-data, répondait 403 sur un
-# dossier pourtant rempli. Les modes sont donc imposés, pas hérités.
-rsync -rltz --chmod=D755,F644 --delete $MODE $EXCLUSIONS --itemize-changes \
+# Pas de `-p` : sans cela rsync recopie les permissions du poste, et le répertoire est
+# arrivé en 700 au premier envoi — Apache, qui tourne en www-data, répondait 403 sur un
+# dossier pourtant rempli.
+#
+# Et pas de `--chmod` non plus : macOS livre openrsync, qui ne le connaît pas. Les modes
+# sont donc imposés sur le serveur, après coup — ce qui marche quelle que soit la version
+# de rsync du poste depuis lequel on déploie.
+rsync -rltz --delete $MODE $EXCLUSIONS --itemize-changes \
   "$RACINE"/ "$HOTE:$CIBLE/"
 
 if [ -n "$MODE" ]; then
   echo
   echo "Essai à blanc. Relancer avec --envoyer pour appliquer."
 else
+  ssh "$HOTE" "chown -R root:www-data '$CIBLE' \
+    && find '$CIBLE' -type d -exec chmod 755 {} + \
+    && find '$CIBLE' -type f -exec chmod 644 {} +"
   echo
-  echo "Envoyé. Vérifier : curl -sI https://akta-partners.com | head -1"
+  echo "Envoyé, permissions normalisées."
+  echo "Vérifier : curl -sI https://akta-partners.com | head -1"
 fi
